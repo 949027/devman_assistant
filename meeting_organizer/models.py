@@ -1,3 +1,46 @@
 from django.db import models
 
-# Create your models here.
+
+class ProductManager(models.Model):
+    name = models.CharField('Имя продукт-менеджера', max_length=200)
+    worktime_from = models.TimeField('Рабочее время, с')
+    worktime_to = models.TimeField('Рабочее время, до')
+    telegram_username = models.CharField('Юзернейм в телеграме', max_length=200)
+
+    def __str__(self):
+        return self.name
+
+
+class Student(models.Model):
+    LEVEL = (
+        ('novice', 'Новичок'), ('novice+', 'Новичок+'), ('junior', 'Джуниор')
+    )
+
+    name = models.CharField('Имя ученика', max_length=200)
+    level = models.CharField('Уровень', max_length=200, choices=LEVEL)
+    worktime_from = models.TimeField('Рабочее время, с')
+    worktime_to = models.TimeField('Рабочее время, до')
+    telegram_username = models.CharField('Юзернейм в телеграме', max_length=200)
+
+    def __str__(self):
+        return self.name
+
+
+class Meeting(models.Model):
+    LEVEL = (
+        ('novice', 'Новичок'), ('novice+', 'Новичок+'), ('junior', 'Джуниор')
+    )
+
+    level = models.CharField('Уровень', max_length=200, choices=LEVEL)
+    time = models.TimeField('Время')
+    product_manager = models.ForeignKey(
+        ProductManager,
+        related_name='meetings',
+        verbose_name='Продукт-менеджер',
+        on_delete=models.CASCADE,
+    )
+    team_members = models.ManyToManyField(
+        Student,
+        related_name='meetings',
+        verbose_name='Члены команды',
+    )
