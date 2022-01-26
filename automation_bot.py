@@ -11,11 +11,13 @@ import json
 
 states_database = {}
 student_blank = {}
+json_blank = {}
 
 
 time_keyboard = [['18:00', '18:30', '19:00', '19:30', 'Ни один не подходит']]
 skill_keyboard = [['Новичок', 'Джун']]
 new_blank_keyboard = [['Изменить время','Выйти']]
+
 
 def start(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
@@ -35,12 +37,13 @@ def start(update:Update, context:CallbackContext):
 
 def make_new_blank(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
-    telegram_id = update.message.from_user.id
     context.bot.send_message(
         chat_id=chat_id,
         text=' Выберите удобный для вас интервал созвона из списка',
         reply_markup = ReplyKeyboardMarkup(time_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
+
+    return 'TIME'
      
 
 def get_student_time(update:Update, context:CallbackContext):
@@ -48,7 +51,7 @@ def get_student_time(update:Update, context:CallbackContext):
     student_time = update.effective_message.text
     context.bot.send_message(
         chat_id=chat_id,
-        text = f'Вы выбрали созвон, который начинается в {student_time}'
+        text = f'Вы выбрали созвон, который начинается в {student_time}\n'
                 'Теперь выберите, к какой категории учеников вы относитесь',
         reply_markup = ReplyKeyboardMarkup(skill_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
@@ -60,19 +63,25 @@ def get_student_time(update:Update, context:CallbackContext):
 def get_student_skill(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_skill = update.effective_message.text
+    telegram_id = update.effective_message.from_user.id
     student_blank.update({'Уровень': student_skill})
     context.bot.send_message(
         chat_id=chat_id,
         text=f'Ваш уровень - {student_skill}'
     )
+    json_blank.update({telegram_id: student_blank})
+    
     with open('student_blank.json', 'w', encoding='utf-8') as file:
-        json.dump(student_blank, file, ensure_ascii=False)
+        json.dump(json_blank, file, ensure_ascii=False)
+    
+    student_blank.clear()
+    
 
 
 def handle_user_reply(update: Update, context: CallbackContext):
     with open('student_blank.json', 'r', encoding='utf-8') as file:
         json_student_blank = json.load(file)
-        student_blank.update(json_student_blank)
+        json_blank.update(json_student_blank)
 
     if update.message:
         user_reply = update.message.text
@@ -89,10 +98,8 @@ def handle_user_reply(update: Update, context: CallbackContext):
         if str(user_id) in json_student_blank:
             context.bot.send_message(
                 chat_id=chat_id,
-                text = 'Вы уже выбрали время созвона, если хотите внести изменения, нажмите соотвествующую кнопку'
-                reply_markup = ReplyKeyboardMarkup(resize)
+                text = 'Вы уже выбрали время созвона, если хотите внести изменения, напишите куратору',
             )
-            user_state = 'NEW_BLANK'
         else:     
             user_state = 'START'
     else:
@@ -102,6 +109,7 @@ def handle_user_reply(update: Update, context: CallbackContext):
         'START': start,
         'TIME': get_student_time,
         'SKILL': get_student_skill,
+        'NEW_BLANK': make_new_blank,
     }
 
     state_handler = states_functions[user_state]
