@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import os
-from telegram import Update, chat, replymarkup
+from telegram import Update
 from telegram.ext import Filters
 from telegram.ext import CallbackContext
 from telegram.ext import Updater
@@ -11,26 +11,21 @@ import json
 
 states_database = {}
 student_blank = {}
-json_blank = {}
+json_blank = {}         # Записать в базу
 
 
-time_keyboard = [['18:00', '18:30', '19:00', '19:30', 'Ни один не подходит']]
-skill_keyboard = [['Новичок', 'Джун']]
+time_keyboard = [['18:00-18:30', '18:30-19:00', '19:00-19:30', '19:30-20:00', 'Ни один не подходит']]
 new_blank_keyboard = [['Изменить время','Выйти']]
 
 
 def start(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
-    first_name = update.message.from_user.first_name
-    last_name = update.message.from_user.last_name
-    telegram_id = update.message.from_user.id
     context.bot.send_message(
         chat_id=chat_id,
         text=' Привет, я бот, созданный для упрощения работы по организации проектов для курсов Devman.'
              ' Выберите удобный для вас интервал созвона из списка',
         reply_markup = ReplyKeyboardMarkup(time_keyboard, resize_keyboard=True, one_time_keyboard=True) 
     )
-    student_blank.update({'Имя Фамилия': f'{first_name} {last_name}', 'telegram':telegram_id})
     
     return 'TIME'
 
@@ -42,42 +37,28 @@ def make_new_blank(update:Update, context:CallbackContext):
         text=' Выберите удобный для вас интервал созвона из списка',
         reply_markup = ReplyKeyboardMarkup(time_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
-
     return 'TIME'
      
 
 def get_student_time(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_time = update.effective_message.text
+    student_username = update.effective_message.from_user.username
     context.bot.send_message(
         chat_id=chat_id,
         text = f'Вы выбрали созвон, который начинается в {student_time}\n'
-                'Теперь выберите, к какой категории учеников вы относитесь',
-        reply_markup = ReplyKeyboardMarkup(skill_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
     student_blank.update({'Время': student_time})
+    json_blank.update({student_username: student_time})
 
-    return 'SKILL'
-
-
-def get_student_skill(update:Update, context:CallbackContext):
-    chat_id = update.effective_message.chat_id
-    student_skill = update.effective_message.text
-    telegram_id = update.effective_message.from_user.id
-    student_blank.update({'Уровень': student_skill})
-    context.bot.send_message(
-        chat_id=chat_id,
-        text=f'Ваш уровень - {student_skill}'
-    )
-    json_blank.update({telegram_id: student_blank})
-    
     with open('student_blank.json', 'w', encoding='utf-8') as file:
         json.dump(json_blank, file, ensure_ascii=False)
     
     student_blank.clear()
+
+    return 'SKILL'
     
-
-
+   
 def handle_user_reply(update: Update, context: CallbackContext):
     with open('student_blank.json', 'r', encoding='utf-8') as file:
         json_student_blank = json.load(file)
@@ -87,6 +68,7 @@ def handle_user_reply(update: Update, context: CallbackContext):
         user_reply = update.message.text
         chat_id = update.message.chat_id
         user_id = update.message.from_user.id
+        username = update.message.from_user.username
 
     elif update.callback_query:
         user_reply = update.callback_query.data
@@ -95,10 +77,10 @@ def handle_user_reply(update: Update, context: CallbackContext):
         return
 
     if user_reply == '/start':
-        if str(user_id) in json_student_blank:
+        if username in json_student_blank:
             context.bot.send_message(
                 chat_id=chat_id,
-                text = 'Вы уже выбрали время созвона, если хотите внести изменения, напишите куратору',
+                text = 'Вы уже выбрали время созвона, если хотите внести изменения, напишите куратору'
             )
         else:     
             user_state = 'START'
@@ -108,7 +90,6 @@ def handle_user_reply(update: Update, context: CallbackContext):
     states_functions = {
         'START': start,
         'TIME': get_student_time,
-        'SKILL': get_student_skill,
         'NEW_BLANK': make_new_blank,
     }
 
