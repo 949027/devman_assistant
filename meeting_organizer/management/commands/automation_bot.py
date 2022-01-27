@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from django.core.management.base import BaseCommand
 import os
 from telegram import Update
 from telegram.ext import Filters
@@ -98,15 +99,14 @@ def handle_user_reply(update: Update, context: CallbackContext):
     states_database.update({chat_id: next_state})
 
 
-def main():
-    load_dotenv()
-    telegram_token= os.getenv('TELEGRAM_BOT_TOKEN')
-    updater = Updater(telegram_token)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler('start', handle_user_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_user_reply))
-    dispatcher.add_handler(CallbackQueryHandler(handle_user_reply))
-    updater.start_polling()
+class Command(BaseCommand):
 
-if __name__=='__main__':
-    main()
+    def handle(self, *args, **options):
+        load_dotenv()
+        telegram_token= os.getenv('TELEGRAM_BOT_TOKEN')
+        updater = Updater(telegram_token)
+        dispatcher = updater.dispatcher
+        dispatcher.add_handler(CommandHandler('start', handle_user_reply))
+        dispatcher.add_handler(MessageHandler(Filters.text, handle_user_reply))
+        dispatcher.add_handler(CallbackQueryHandler(handle_user_reply))
+        updater.start_polling()
