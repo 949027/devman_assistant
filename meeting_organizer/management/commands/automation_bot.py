@@ -1,3 +1,4 @@
+from pydoc import text
 from dotenv import load_dotenv
 from django.core.management.base import BaseCommand
 import os
@@ -17,18 +18,22 @@ json_blank = {}        # Записать в базу
 
 time_keyboard = [['18:00-18:30', '18:30-19:00', '19:00-19:30', '19:30-20:00', 'Любое время', 'Ни один не подходит']]
 new_blank_keyboard = [['Изменить время','Выйти']]
+time_choice_keyboard = [['Принять', 'Конкретное время', 'Другое время']]
 
 
 def start(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     context.bot.send_message(
         chat_id=chat_id,
-        text=' Привет, я бот, созданный для упрощения работы по организации проектов для курсов Devman.'
-             ' Выберите удобный для вас интервал созвона из списка',
-        reply_markup = ReplyKeyboardMarkup(time_keyboard, resize_keyboard=True, one_time_keyboard=True) 
+        text=' Привет, я бот, созданный для упрощения работы по организации проектов для курсов Devman.\n'
+             ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30.\n'   
+             ' Удобно ли вам созваниваться в один из промежутков с 18:00 до 20:00? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
+             ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n'
+             ' Если же вам не подходит данное время, нажмите Другое время.',
+             reply_markup=ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
     
-    return 'TIME'
+    return 'CHOICE'
 
 
 def make_new_blank(update:Update, context:CallbackContext):
@@ -41,19 +46,23 @@ def make_new_blank(update:Update, context:CallbackContext):
              'Если вы хотите изменить его, выберите соответствующий пункт меню.',
         reply_markup = ReplyKeyboardMarkup(new_blank_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
+    print(update.effective_message.chat_id)
     return 'CHOICE_CHECK'
 
 
-def choice_check(update:Update, context:CallbackContext):
+def new_blank_choice_check(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     user_reply = update.effective_message.text
     if user_reply == 'Изменить время':
         context.bot.send_message(
             chat_id=chat_id,
-            text= ' Выберите удобный для вас интервал созвона из списка',
-            reply_markup = ReplyKeyboardMarkup(time_keyboard, resize_keyboard=True, one_time_keyboard=True) 
+            text= ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30.\n'   
+                ' Удобно ли вам созваниваться в один из промежутков с 18:00 до 20:00? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
+                ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n'
+                ' Если же вам не подходит данное время, нажмите Другое время.',
+            reply_markup = ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True) 
         )
-        return 'TIME'
+        return 'CHOICE'
     elif user_reply == 'Выйти':
         context.bot.send_message(
             chat_id=chat_id,
@@ -67,31 +76,55 @@ def choice_check(update:Update, context:CallbackContext):
         )
 
 
+def get_student_choice(update:Update, context:CallbackContext):
+    chat_id = update.effective_message.chat_id
+    student_username = update.effective_message.from_user.username
+    student_reply = update.effective_message.text
+    if student_reply == 'Принять':
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='Вы выбрали время созвона в промежутке с 18:00 до 20:00. Когда группы будут распределены, конкретное время вам сообщит куратор'
+        )
+        student_blank.update({'Время': '18:00-20:00'})
+        json_blank.update({student_username: '18:00-20:00'})
+        with open('student_blank.json', 'w', encoding='utf-8') as file:
+            json.dump(json_blank, file, ensure_ascii=False)
+        student_blank.clear()
+    elif student_reply == 'Конкретное время':
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='Введите конкретный промежуток времени в формате чч:мм-чч:мм (Например - 18:00-18:30 без пробелов)'
+        )
+        return 'TIME' 
+    elif student_reply == 'Другое время':
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='Напишите нам интервал времени, в которой вам удобно созвониться в формате чч:мм-чч:мм (Например - 10:00-11:00 без пробелов)'
+        )
+        return 'TIME'
+    else:    
+        context.bot.send_message(
+            chat_id=chat_id,
+            text = 'Не понимаю, что вы хотели написать, начните процедуру заново.'
+        )
+        return 'START'
+
+
 def get_student_time(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_username = update.effective_message.from_user.username
     student_reply = update.effective_message.text
-    if student_reply == 'Любое время':
-        context.bot.send_message(
-            chat_id=chat_id,
-            text='Вы выбрали любое время созвона. Когда группы будут распределены, конкретное время вам сообщит куратор'
-        )
-        student_blank.update({'Время': student_reply})
-        json_blank.update({student_username: student_reply})
-    else:    
-        context.bot.send_message(
-            chat_id=chat_id,
-            text = f'Вы выбрали созвон, который начинается в {student_reply}\n'
-        )
-        student_blank.update({'Время': student_reply})
-        json_blank.update({student_username: student_reply})
-
+    context.bot.send_message(
+        chat_id=chat_id,
+        text=f'Вы указали время созвона - {student_reply}'
+    )
+    student_blank.update({'Время': student_reply})
+    json_blank.update({student_username: student_reply})
     with open('student_blank.json', 'w', encoding='utf-8') as file:
-        json.dump(json_blank, file, ensure_ascii=False)
-    
-    student_blank.clear()
-    
-   
+            json.dump(json_blank, file, ensure_ascii=False)
+    student_blank.clear
+
+
 def handle_user_reply(update: Update, context: CallbackContext):
     with open('student_blank.json', 'r', encoding='utf-8') as file:
         json_student_blank = json.load(file)
@@ -119,9 +152,11 @@ def handle_user_reply(update: Update, context: CallbackContext):
 
     states_functions = {
         'START': start,
-        'TIME': get_student_time,
+        'CHOICE': get_student_choice,
         'NEW_BLANK': make_new_blank,
-        'CHOICE_CHECK': choice_check
+        'CHOICE_CHECK': new_blank_choice_check,
+        'TIME': get_student_time
+
     }
 
     state_handler = states_functions[user_state]
@@ -138,5 +173,4 @@ class Command(BaseCommand):
         dispatcher = updater.dispatcher
         dispatcher.add_handler(CommandHandler('start', handle_user_reply))
         dispatcher.add_handler(MessageHandler(Filters.text, handle_user_reply))
-        dispatcher.add_handler(CallbackQueryHandler(handle_user_reply))
         updater.start_polling()
