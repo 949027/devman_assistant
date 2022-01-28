@@ -21,7 +21,7 @@ class Command(BaseCommand):
                 student.save()
             students_queue = list(Student.objects.filter(level=level).order_by('time_interval'))
 
-            for meeting in Meeting.objects.all():
+            for meeting in Meeting.objects.filter(team_members=None):
                 candidates = []
                 for student in students_queue:
                     if student.worktime_from <= meeting.time and student.worktime_to > meeting.time:
