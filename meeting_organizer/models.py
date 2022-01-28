@@ -20,6 +20,7 @@ class Student(models.Model):
     level = models.CharField('Уровень', max_length=200, choices=LEVEL)
     worktime_from = models.TimeField('Рабочее время, с')
     worktime_to = models.TimeField('Рабочее время, до')
+    time_interval = models.CharField('Интервал рабочего времени', null=True, blank=True, max_length=200)
     telegram_username = models.CharField('Юзернейм в телеграме', max_length=200)
 
     def __str__(self):
@@ -31,7 +32,7 @@ class Meeting(models.Model):
         ('novice', 'Новичок'), ('novice+', 'Новичок+'), ('junior', 'Джуниор')
     )
 
-    level = models.CharField('Уровень', max_length=200, choices=LEVEL)
+    level = models.CharField('Уровень', max_length=200, choices=LEVEL, blank=True, null=True)
     time = models.TimeField('Время')
     product_manager = models.ForeignKey(
         ProductManager,
@@ -43,4 +44,5 @@ class Meeting(models.Model):
         Student,
         related_name='meetings',
         verbose_name='Члены команды',
+        blank=True,
     )
