@@ -17,15 +17,13 @@ class StudentAdmin(admin.ModelAdmin):
         'name',
         'worktime_from',
         'worktime_to',
-        'telegram_username'
+        'telegram_username',
+        'time_interval'
     ]
 
 
 class MeetingAdmin(admin.ModelAdmin):
-    list_display = [
-        'time',
-        'product_manager',
-    ]
+    list_display = ['time', 'product_manager']
 
 
 admin.site.register(ProductManager, ProductManagerAdmin)
