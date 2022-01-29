@@ -10,6 +10,8 @@ from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup
 import json
 
+from meeting_organizer.models import Meeting, Student, ProductManager
+
 
 states_database = {}
 student_blank = {}
@@ -22,12 +24,14 @@ time_choice_keyboard = [['Принять', 'Конкретное время', '�
 
 
 def start(update:Update, context:CallbackContext):
+    min_time = ProductManager.objects.order_by('worktime_from').first().worktime_from
+    max_time = ProductManager.objects.order_by('-worktime_to').first().worktime_to
     chat_id = update.effective_message.chat_id
     context.bot.send_message(
         chat_id=chat_id,
         text=' Привет, я бот, созданный для упрощения работы по организации проектов для курсов Devman.\n'
              ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30.\n'   
-             ' Удобно ли вам созваниваться в один из промежутков с 18:00 до 20:00? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
+             f' Удобно ли вам созваниваться в один из промежутков с {min_time} до {max_time}? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
              ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n'
              ' Если же вам не подходит данное время, нажмите Другое время.',
              reply_markup=ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -38,11 +42,13 @@ def start(update:Update, context:CallbackContext):
 
 def make_new_blank(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
+    student_username = update.effective_message.from_user.username
     student_id = update.effective_message.from_user.username
-    last_student_time = json_blank[student_id]
+    #last_student_time = json_blank[student_id]
+    db_student = Student.objects.get(telegram_username=student_username)
     context.bot.send_message(
         chat_id=chat_id,
-        text=f'Вы уже указывали время созвона - {last_student_time}.\n'
+        text=f'Вы уже указывали время созвона {db_student.worktime_from} - {db_student.worktime_to}.\n'
              'Если вы хотите изменить его, выберите соответствующий пункт меню.',
         reply_markup = ReplyKeyboardMarkup(new_blank_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
@@ -85,17 +91,21 @@ def get_student_choice(update:Update, context:CallbackContext):
             chat_id=chat_id,
             text='Вы выбрали время созвона в промежутке с 18:00 до 20:00. Когда группы будут распределены, конкретное время вам сообщит куратор'
         )
-        student_blank.update({'Время': '18:00-20:00'})
-        json_blank.update({student_username: '18:00-20:00'})
-        with open('student_blank.json', 'w', encoding='utf-8') as file:
-            json.dump(json_blank, file, ensure_ascii=False)
-        student_blank.clear()
+        db_student = Student.objects.get(telegram_username=student_username)
+        db_student.worktime_from = '18:00'
+        db_student.worktime_to = '20:00'
+        db_student.save()
+        # student_blank.update({'Время': '18:00-20:00'})
+        # json_blank.update({student_username: '18:00-20:00'})
+        # with open('student_blank.json', 'w', encoding='utf-8') as file:
+        #     json.dump(json_blank, file, ensure_ascii=False)
+        # student_blank.clear()
     elif student_reply == 'Конкретное время':
         context.bot.send_message(
             chat_id=chat_id,
-            text='Введите конкретный промежуток времени в формате чч:мм-чч:мм (Например - 18:00-18:30 без пробелов)'
+            text='Введите начальное время в формате чч:мм (например - 18:00)'
         )
-        return 'TIME' 
+        return 'TIME_FROM'
     elif student_reply == 'Другое время':
         context.bot.send_message(
             chat_id=chat_id,
@@ -110,19 +120,42 @@ def get_student_choice(update:Update, context:CallbackContext):
         return 'START'
 
 
-def get_student_time(update:Update, context:CallbackContext):
+def get_student_time_from(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_username = update.effective_message.from_user.username
     student_reply = update.effective_message.text
     context.bot.send_message(
         chat_id=chat_id,
-        text=f'Вы указали время созвона - {student_reply}'
+        text=f'Введите конечное время в формате чч:мм (например - 22:00)'
     )
-    student_blank.update({'Время': student_reply})
-    json_blank.update({student_username: student_reply})
-    with open('student_blank.json', 'w', encoding='utf-8') as file:
-            json.dump(json_blank, file, ensure_ascii=False)
-    student_blank.clear
+    context.user_data['time_from'] = student_reply
+    return 'TIME_TO'
+    # student_blank.update({'Время': student_reply})
+    # json_blank.update({student_username: student_reply})
+    # with open('student_blank.json', 'w', encoding='utf-8') as file:
+    #         json.dump(json_blank, file, ensure_ascii=False)
+    # student_blank.clear
+
+
+def get_student_time_to(update:Update, context:CallbackContext):
+    chat_id = update.effective_message.chat_id
+    student_username = update.effective_message.from_user.username
+
+    time_to = update.effective_message.text
+    time_from = context.user_data['time_from']
+    context.bot.send_message(
+        chat_id=chat_id,
+        text=f'Вы указали время созвона {time_from} - {time_to} '
+    )
+    db_student = Student.objects.get(telegram_username=student_username)
+    db_student.worktime_from = time_from
+    db_student.worktime_to = time_to
+    db_student.save()
+    # student_blank.update({'Время': student_reply})
+    # json_blank.update({student_username: student_reply})
+    # with open('student_blank.json', 'w', encoding='utf-8') as file:
+    #         json.dump(json_blank, file, ensure_ascii=False)
+    # student_blank.clear
 
 
 def handle_user_reply(update: Update, context: CallbackContext):
@@ -143,7 +176,7 @@ def handle_user_reply(update: Update, context: CallbackContext):
         return
 
     if user_reply == '/start':
-        if username in json_student_blank:
+        if Student.objects.get(telegram_username=username).worktime_from:
             user_state = 'NEW_BLANK'
         else:     
             user_state = 'START'
@@ -155,7 +188,8 @@ def handle_user_reply(update: Update, context: CallbackContext):
         'CHOICE': get_student_choice,
         'NEW_BLANK': make_new_blank,
         'CHOICE_CHECK': new_blank_choice_check,
-        'TIME': get_student_time
+        'TIME_FROM': get_student_time_from,
+        'TIME_TO': get_student_time_to,
 
     }
 
