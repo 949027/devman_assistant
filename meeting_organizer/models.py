@@ -18,8 +18,8 @@ class Student(models.Model):
 
     name = models.CharField('Имя ученика', max_length=200)
     level = models.CharField('Уровень', max_length=200, choices=LEVEL)
-    worktime_from = models.TimeField('Рабочее время, с')
-    worktime_to = models.TimeField('Рабочее время, до')
+    worktime_from = models.TimeField('Рабочее время, с', blank=True, null=True)
+    worktime_to = models.TimeField('Рабочее время, до', blank=True, null=True)
     time_interval = models.CharField('Интервал рабочего времени', null=True, blank=True, max_length=200)
     telegram_username = models.CharField('Юзернейм в телеграме', max_length=200)
 
