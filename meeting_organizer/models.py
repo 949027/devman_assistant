@@ -22,6 +22,7 @@ class Student(models.Model):
     worktime_to = models.TimeField('Рабочее время, до', blank=True, null=True)
     time_interval = models.CharField('Интервал рабочего времени', null=True, blank=True, max_length=200)
     telegram_username = models.CharField('Юзернейм в телеграме', max_length=200)
+    telegram_chat_id = models.IntegerField('ID чата в телеграм', null=True, blank=True)
 
     def __str__(self):
         return self.name

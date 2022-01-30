@@ -24,6 +24,7 @@ time_choice_keyboard = [['Принять', 'Конкретное время', '�
 
 
 def start(update:Update, context:CallbackContext):
+    student_username = update.effective_message.from_user.username
     min_time = ProductManager.objects.order_by('worktime_from').first().worktime_from
     max_time = ProductManager.objects.order_by('-worktime_to').first().worktime_to
     chat_id = update.effective_message.chat_id
@@ -36,7 +37,9 @@ def start(update:Update, context:CallbackContext):
              ' Если же вам не подходит данное время, нажмите Другое время.',
              reply_markup=ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
-    
+    db_student = Student.objects.get(telegram_username=student_username)
+    db_student.telegram_chat_id = chat_id
+    db_student.save()
     return 'CHOICE'
 
 
