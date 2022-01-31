@@ -1,5 +1,7 @@
+import logging
+
 from django.core.management.base import BaseCommand
-from django.db.models import Count
+from django.db.models import Count, Q
 from datetime import timedelta, datetime, date
 import telegram
 
@@ -11,16 +13,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         levels = ['novice', 'novice+', 'junior']
         free_students = []
-
         for level in levels:
             d = date(1900, 1, 1)
-            for i in Student.objects.all():
+            for i in Student.objects.filter(meetings=None):
                 student = Student.objects.get(id=i.id)
                 worktime_to = datetime.combine(d, student.worktime_to)
                 worktime_from = datetime.combine(d, student.worktime_from)
                 student.time_interval = worktime_to-worktime_from
                 student.save()
             students_queue = list(Student.objects.filter(level=level).order_by('time_interval'))
+
             for meeting in Meeting.objects.filter(team_members=None):
                 candidates = []
 
@@ -43,11 +45,12 @@ class Command(BaseCommand):
                         meeting.team_members.through.objects.create(meeting_id=meeting.id, student_id=candidate.id)
                         students_queue.remove(candidate)
 
-                if candidates_amount < 2:
-                    Meeting.objects.get(id=meeting.id).delete()
-
             for student in students_queue:
                 free_students.append(student)
+
+        #удалить встречи
+        for meeting in Meeting.objects.filter(team_members=None):
+            Meeting.objects.get(id=meeting.id).delete()
 
         incomplete_teams = Meeting.objects.annotate(num_members=Count('team_members')).filter(num_members=2)
         available_time = []
@@ -60,4 +63,7 @@ class Command(BaseCommand):
                    'Сможешь выбрать другой промежуток времени? Для этого нажми ' \
                    f'кнопку "Другое время".\n Вот какое время доступно:\n {available_time}'
             bot = telegram.Bot(token='5003258723:AAFUwJ_Jda918H9OU8Q9DWI1RRtAiw168yw')
-            bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
+            try:
+                bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
+            except telegram.error.BadRequest:
+                logging.warning(f'Message for {student} was not sent')
