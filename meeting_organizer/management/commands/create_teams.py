@@ -13,10 +13,9 @@ class Command(BaseCommand):
             meeting_end = meeting_start + timedelta(minutes=30)
 
             while meeting_end <= datetime.combine(d, product_manager.worktime_to):
-                print(meeting_start)
+                Meeting.objects.get_or_create(
+                    time=meeting_start,
+                    product_manager=ProductManager.objects.get(id=product_manager.id),
+                )
                 meeting_start += timedelta(minutes=30)
                 meeting_end = meeting_start + timedelta(minutes=30)
-                Meeting.objects.create(
-                    time=meeting_start,
-                    product_manager=ProductManager.objects.all().first(),
-                )
