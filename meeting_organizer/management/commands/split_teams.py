@@ -12,7 +12,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         levels = ['novice', 'novice+', 'junior']
-        free_students = []
         for level in levels:
             d = date(1900, 1, 1)
             for i in Student.objects.filter(meetings=None):
@@ -45,25 +44,26 @@ class Command(BaseCommand):
                         meeting.team_members.through.objects.create(meeting_id=meeting.id, student_id=candidate.id)
                         students_queue.remove(candidate)
 
+            free_students = []
             for student in students_queue:
                 free_students.append(student)
+
+            incomplete_teams = Meeting.objects.annotate(num_members=Count('team_members')).filter(num_members=2)
+            available_time = []
+            for team in incomplete_teams:
+                available_time.append(str(team.time))
+
+            #рассылка сообщений свободным ученикам
+            for student in free_students:
+                text = 'Привет! К сожалению, в удобное для тебя время созвонов нет.\n' \
+                       'Сможешь выбрать другой промежуток времени? Для этого нажми ' \
+                       f'кнопку "Другое время".\n Вот какое время доступно:\n {available_time}'
+                bot = telegram.Bot(token='5003258723:AAFUwJ_Jda918H9OU8Q9DWI1RRtAiw168yw')
+                try:
+                    bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
+                except telegram.error.BadRequest:
+                    logging.warning(f'Message for {student} was not sent')
 
         #удалить встречи
         for meeting in Meeting.objects.filter(team_members=None):
             Meeting.objects.get(id=meeting.id).delete()
-
-        incomplete_teams = Meeting.objects.annotate(num_members=Count('team_members')).filter(num_members=2)
-        available_time = []
-        for team in incomplete_teams:
-            available_time.append(str(team.time))
-
-        #рассылка сообщений свободным ученикам
-        for student in free_students:
-            text = 'Привет! К сожалению, в удобное для тебя время созвонов нет.\n' \
-                   'Сможешь выбрать другой промежуток времени? Для этого нажми ' \
-                   f'кнопку "Другое время".\n Вот какое время доступно:\n {available_time}'
-            bot = telegram.Bot(token='5003258723:AAFUwJ_Jda918H9OU8Q9DWI1RRtAiw168yw')
-            try:
-                bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
-            except telegram.error.BadRequest:
-                logging.warning(f'Message for {student} was not sent')
