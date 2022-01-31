@@ -20,10 +20,12 @@ class StudentAdmin(admin.ModelAdmin):
         'telegram_username',
         'time_interval'
     ]
+    readonly_fields = ('telegram_chat_id', 'time_interval', )
 
 
 class MeetingAdmin(admin.ModelAdmin):
     list_display = ['time', 'product_manager']
+    readonly_fields = ('level',)
 
 
 admin.site.register(ProductManager, ProductManagerAdmin)
