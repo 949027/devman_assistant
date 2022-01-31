@@ -1,3 +1,4 @@
+from calendar import c
 from pydoc import text
 from dotenv import load_dotenv
 from django.core.management.base import BaseCommand
@@ -9,6 +10,7 @@ from telegram.ext import Updater
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup
 import json
+from datetime import datetime
 
 from meeting_organizer.models import Meeting, Student, ProductManager
 
@@ -31,10 +33,9 @@ def start(update:Update, context:CallbackContext):
     context.bot.send_message(
         chat_id=chat_id,
         text=' Привет, я бот, созданный для упрощения работы по организации проектов для курсов Devman.\n'
-             ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30.\n'   
+             ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30. Время московское.\n'   
              f' Удобно ли вам созваниваться в один из промежутков с {min_time} до {max_time}? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
-             ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n'
-             ' Если же вам не подходит данное время, нажмите Другое время.',
+             ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n',
              reply_markup=ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
     db_student = Student.objects.get(telegram_username=student_username)
@@ -65,10 +66,9 @@ def new_blank_choice_check(update:Update, context:CallbackContext):
     if user_reply == 'Изменить время':
         context.bot.send_message(
             chat_id=chat_id,
-            text= ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30.\n'   
+            text= ' Интервал созвонов полчаса, поэтому выбирайте начало либо в :00 минут, либо в :30. Время московское.\n'   
                 ' Удобно ли вам созваниваться в один из промежутков с 18:00 до 20:00? Если подойдет любое время из этого промежутка, нажмите Принять.\n'
-                ' Если вам будет удобно конкретное время из этого промежутка, нажмите Конкретное время.\n'
-                ' Если же вам не подходит данное время, нажмите Другое время.',
+                ' Если вам будет удобно указать конкретный интервал созвона, нажмите Конкретное время.\n',
             reply_markup = ReplyKeyboardMarkup(time_choice_keyboard, resize_keyboard=True, one_time_keyboard=True) 
         )
         return 'CHOICE'
@@ -109,12 +109,6 @@ def get_student_choice(update:Update, context:CallbackContext):
             text='Введите начальное время в формате чч:мм (например - 18:00)'
         )
         return 'TIME_FROM'
-    elif student_reply == 'Другое время':
-        context.bot.send_message(
-            chat_id=chat_id,
-            text='Напишите нам интервал времени, в которой вам удобно созвониться в формате чч:мм-чч:мм (Например - 10:00-11:00 без пробелов)'
-        )
-        return 'TIME'
     else:    
         context.bot.send_message(
             chat_id=chat_id,
@@ -127,12 +121,33 @@ def get_student_time_from(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_username = update.effective_message.from_user.username
     student_reply = update.effective_message.text
-    context.bot.send_message(
-        chat_id=chat_id,
-        text=f'Введите конечное время в формате чч:мм (например - 22:00)'
-    )
-    context.user_data['time_from'] = student_reply
-    return 'TIME_TO'
+    try:
+        time_from = datetime.strptime(student_reply, "%H:%M")
+        valid_time_from = '10:00'
+        valid_time_from = datetime.strptime(valid_time_from,"%H:%M")
+        valid_time_to = '21:30'
+        valid_time_to = datetime.strptime(valid_time_to,"%H:%M")
+        if valid_time_from<=time_from<=valid_time_to:
+            context.bot.send_message(
+                chat_id=chat_id,
+                text=f'Введите конечное время в формате чч:мм (например - 22:00)'
+            )
+            context.user_data['time_from'] = student_reply
+            return 'TIME_TO'
+        else:
+            context.bot.send_message(
+                chat_id=chat_id,
+                text='Время не подходит или неверный формат времени, повторите ввод.'
+            )
+            return 'TIME_FROM'
+    except ValueError:
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='Некорректное время. Введите время с которого вам удобно созваниваться в формате "HH:MM" '
+            '(например: 18:30).'
+            )
+        return 'TIME_FROM'
+
     # student_blank.update({'Время': student_reply})
     # json_blank.update({student_username: student_reply})
     # with open('student_blank.json', 'w', encoding='utf-8') as file:
@@ -144,16 +159,45 @@ def get_student_time_to(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_username = update.effective_message.from_user.username
 
-    time_to = update.effective_message.text
+    student_reply = update.effective_message.text
     time_from = context.user_data['time_from']
-    context.bot.send_message(
-        chat_id=chat_id,
-        text=f'Вы указали время созвона {time_from} - {time_to} '
-    )
-    db_student = Student.objects.get(telegram_username=student_username)
-    db_student.worktime_from = time_from
-    db_student.worktime_to = time_to
-    db_student.save()
+    if student_reply > time_from:
+        try:
+            time_to = datetime.strptime(student_reply, "%H:%M")
+            valid_time_from = '10:30'
+            valid_time_from = datetime.strptime(valid_time_from,"%H:%M")
+            valid_time_to = '22:00'
+            valid_time_to = datetime.strptime(valid_time_to,"%H:%M")
+            
+            if valid_time_from <= time_to <= valid_time_to:
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f'Вы указали время созвона {time_from} - {student_reply} '
+                    )
+                db_student = Student.objects.get(telegram_username=student_username)
+                db_student.worktime_from = time_from
+                db_student.worktime_to = student_reply
+                db_student.save()
+            else:
+                context.bot.send_message(
+                    chat_id=chat_id,
+                    text='Время не подходит или неверный формат времени, повторите ввод.'
+                )
+                return 'TIME_TO'
+            
+        except ValueError:
+            context.bot.send_message(
+                chat_id=chat_id,
+                text='Некорректное время. Введите время до которого вам удобно созваниваться в формате "HH:MM" '
+                '(например: 18:30).'
+                )
+            return 'TIME_TO'
+    else:
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='"Время до" не может быть меньше "времени с"'
+        )
+        return 'TIME_TO'
     # student_blank.update({'Время': student_reply})
     # json_blank.update({student_username: student_reply})
     # with open('student_blank.json', 'w', encoding='utf-8') as file:
