@@ -11,6 +11,15 @@ from meeting_organizer.models import Meeting, Student
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
+
+        def send_message(student, text):
+            bot = telegram.Bot(token='5003258723:AAFUwJ_Jda918H9OU8Q9DWI1RRtAiw168yw')
+            try:
+                bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
+                logging.warning(f'Message for {student} was sent')
+            except telegram.error.BadRequest:
+                pass
+
         levels = ['novice', 'novice+', 'junior']
         for level in levels:
             d = date(1900, 1, 1)
@@ -38,11 +47,14 @@ class Command(BaseCommand):
                     for candidate in candidates[:3]:
                         meeting.team_members.through.objects.create(meeting_id=meeting.id, student_id=candidate.id)
                         students_queue.remove(candidate)
+                        text = f'Команда скомплектована! Твое время для созвона: {meeting.time}'
+                        send_message(candidate, text)
 
                 if candidates_amount == 2:
                     for candidate in candidates[:2]:
                         meeting.team_members.through.objects.create(meeting_id=meeting.id, student_id=candidate.id)
-                        students_queue.remove(candidate)
+                        text = f'Команда скомплектована! Твое время для созвона: {meeting.time}'
+                        students_queue.remove(candidate, text)
 
             free_students = []
             for student in students_queue:
@@ -58,11 +70,7 @@ class Command(BaseCommand):
                 text = 'Привет! К сожалению, в удобное для тебя время созвонов нет.\n' \
                        'Сможешь выбрать другой промежуток времени? Для этого нажми ' \
                        f'кнопку "Другое время".\n Вот какое время доступно:\n {available_time}'
-                bot = telegram.Bot(token='5003258723:AAFUwJ_Jda918H9OU8Q9DWI1RRtAiw168yw')
-                try:
-                    bot.sendMessage(chat_id=student.telegram_chat_id, text=text)
-                except telegram.error.BadRequest:
-                    logging.warning(f'Message for {student} was not sent')
+                send_message(student, text)
 
         #удалить встречи
         for meeting in Meeting.objects.filter(team_members=None):
