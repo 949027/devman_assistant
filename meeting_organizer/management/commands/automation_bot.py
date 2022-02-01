@@ -1,24 +1,20 @@
-from calendar import c
-from pydoc import text
+from datetime import datetime
+import os
+
 from dotenv import load_dotenv
 from django.core.management.base import BaseCommand
-import os
 from telegram import Update
 from telegram.ext import Filters
 from telegram.ext import CallbackContext
 from telegram.ext import Updater
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import CommandHandler, MessageHandler
 from telegram import ReplyKeyboardMarkup
-import json
-from datetime import datetime
 
-from meeting_organizer.models import Meeting, Student, ProductManager
+from meeting_organizer.models import Student, ProductManager
 
 
 states_database = {}
 student_blank = {}
-json_blank = {}        # Записать в базу
-
 
 time_keyboard = [['18:00-18:30', '18:30-19:00', '19:00-19:30', '19:30-20:00', 'Любое время', 'Ни один не подходит']]
 new_blank_keyboard = [['Изменить время','Выйти']]
@@ -47,8 +43,6 @@ def start(update:Update, context:CallbackContext):
 def make_new_blank(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
     student_username = update.effective_message.from_user.username
-    student_id = update.effective_message.from_user.username
-    #last_student_time = json_blank[student_id]
     db_student = Student.objects.get(telegram_username=student_username)
     context.bot.send_message(
         chat_id=chat_id,
@@ -56,7 +50,6 @@ def make_new_blank(update:Update, context:CallbackContext):
              'Если вы хотите изменить его, выберите соответствующий пункт меню.',
         reply_markup = ReplyKeyboardMarkup(new_blank_keyboard, resize_keyboard=True, one_time_keyboard=True)
     )
-    print(update.effective_message.chat_id)
     return 'CHOICE_CHECK'
 
 
@@ -98,11 +91,7 @@ def get_student_choice(update:Update, context:CallbackContext):
         db_student.worktime_from = '18:00'
         db_student.worktime_to = '20:00'
         db_student.save()
-        # student_blank.update({'Время': '18:00-20:00'})
-        # json_blank.update({student_username: '18:00-20:00'})
-        # with open('student_blank.json', 'w', encoding='utf-8') as file:
-        #     json.dump(json_blank, file, ensure_ascii=False)
-        # student_blank.clear()
+
     elif student_reply == 'Конкретное время':
         context.bot.send_message(
             chat_id=chat_id,
@@ -119,7 +108,6 @@ def get_student_choice(update:Update, context:CallbackContext):
 
 def get_student_time_from(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
-    student_username = update.effective_message.from_user.username
     student_reply = update.effective_message.text
     try:
         time_from = datetime.strptime(student_reply, "%H:%M")
@@ -147,13 +135,6 @@ def get_student_time_from(update:Update, context:CallbackContext):
             '(например: 18:30).'
             )
         return 'TIME_FROM'
-
-    # student_blank.update({'Время': student_reply})
-    # json_blank.update({student_username: student_reply})
-    # with open('student_blank.json', 'w', encoding='utf-8') as file:
-    #         json.dump(json_blank, file, ensure_ascii=False)
-    # student_blank.clear
-
 
 def get_student_time_to(update:Update, context:CallbackContext):
     chat_id = update.effective_message.chat_id
@@ -198,18 +179,8 @@ def get_student_time_to(update:Update, context:CallbackContext):
             text='"Время до" не может быть меньше "времени с"'
         )
         return 'TIME_TO'
-    # student_blank.update({'Время': student_reply})
-    # json_blank.update({student_username: student_reply})
-    # with open('student_blank.json', 'w', encoding='utf-8') as file:
-    #         json.dump(json_blank, file, ensure_ascii=False)
-    # student_blank.clear
-
 
 def handle_user_reply(update: Update, context: CallbackContext):
-    with open('student_blank.json', 'r', encoding='utf-8') as file:
-        json_student_blank = json.load(file)
-        json_blank.update(json_student_blank)
-    
     if update.message:
         user_reply = update.message.text
         chat_id = update.message.chat_id
